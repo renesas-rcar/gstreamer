@@ -69,6 +69,7 @@ struct _GstWaylandSink
   GstBuffer *last_buffer;
 
   struct wl_callback *callback;
+  struct wl_event_queue *frame_queue;
 };
 
 struct _GstWaylandSinkClass
