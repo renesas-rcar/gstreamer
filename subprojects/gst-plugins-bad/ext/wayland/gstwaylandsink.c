@@ -386,6 +386,13 @@ gst_wayland_sink_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_NULL_TO_READY:
       if (!gst_wayland_sink_find_display (sink))
         return GST_STATE_CHANGE_FAILURE;
+
+      /* the event queue specific for wl_surface_frame events */
+      sink->frame_queue = wl_display_create_queue (sink->display->display);
+      if (!sink->frame_queue) {
+        GST_ERROR_OBJECT (sink, "failed to create wl_event_queue");
+        return GST_STATE_CHANGE_FAILURE;
+      }
       break;
     default:
       break;
@@ -427,8 +434,10 @@ gst_wayland_sink_change_state (GstElement * element, GstStateChange transition)
        * to avoid requesting them again from the application if/when we are
        * restarted (GstVideoOverlay behaves like that in other sinks)
        */
-      if (sink->display && !sink->window)       /* -> the window was toplevel */
+      if (sink->display && !sink->window) {      /* -> the window was toplevel */
+        wl_event_queue_destroy (sink->frame_queue);
         g_clear_object (&sink->display);
+      }
 
       g_mutex_unlock (&sink->display_lock);
       g_clear_object (&sink->pool);
@@ -670,6 +679,7 @@ render_last_buffer (GstWaylandSink * sink, gboolean redraw)
 
   sink->redraw_pending = TRUE;
   callback = wl_surface_frame (surface);
+  wl_proxy_set_queue ((struct wl_proxy *) callback, sink->frame_queue);
   sink->callback = callback;
   wl_callback_add_listener (callback, &frame_callback_listener, sink);
 
@@ -724,10 +734,14 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
     }
   }
 
-  /* drop buffers until we get a frame callback */
-  if (sink->redraw_pending) {
-    GST_LOG_OBJECT (sink, "buffer %p dropped (redraw pending)", buffer);
-    goto done;
+  g_mutex_unlock (&sink->render_lock);
+  wl_display_dispatch_queue_pending (sink->display->display, sink->frame_queue);
+  g_mutex_lock (&sink->render_lock);
+
+  while (sink->redraw_pending == TRUE) {
+    g_mutex_unlock (&sink->render_lock);
+    wl_display_dispatch_queue (sink->display->display, sink->frame_queue);
+    g_mutex_lock (&sink->render_lock);
   }
 
   /* make sure that the application has called set_render_rectangle() */
