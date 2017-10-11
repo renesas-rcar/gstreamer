@@ -449,6 +449,10 @@ if get_option('default_library') == 'shared'
   plugins_pkgconfig_install_dir = disabler()
 endif
 
+if get_option('cont-frame-capture')
+  cdata.set('CONT_FRAME_CAPTURE', 1)
+endif
+
 subdir('gst')
 subdir('sys')
 subdir('ext')
