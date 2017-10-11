@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2001-2002 Ronald Bultje <rbultje@ronald.bitfreak.net>
  *               2006 Edgard Lima <edgard.lima@gmail.com>
+ * Copyright (C) 2017-2018, Renesas Electronics Corporation
  *
  * gstv4l2object.c: base class for V4L2 elements
  *
@@ -43,6 +44,7 @@
 
 #include <gst/video/video.h>
 #include <gst/allocators/gstdmabuf.h>
+#include "gstv4l2src.h"
 
 GST_DEBUG_CATEGORY_EXTERN (v4l2_debug);
 #define GST_CAT_DEFAULT v4l2_debug
@@ -834,6 +836,15 @@ gst_v4l2_get_driver_min_buffers (GstV4l2Object * v4l2object)
     v4l2object->min_buffers = control.value;
   } else {
     v4l2object->min_buffers = 0;
+  }
+  if (GST_IS_V4L2SRC (v4l2object->element) == TRUE) {
+#ifdef CONT_FRAME_CAPTURE
+    /* RCarVIN driver support 2 transmission modes:
+     * Single frame capture mode: require 3 or less buffers
+     * Continuous frame capture mode: require 4 or more buffers
+     */
+    v4l2object->min_buffers = 4;
+#endif
   }
 }
 
@@ -5073,6 +5084,15 @@ gst_v4l2_object_decide_allocation (GstV4l2Object * obj, GstQuery * query)
       own_min += 2;
       gst_v4l2_buffer_pool_copy_at_threshold (GST_V4L2_BUFFER_POOL (pool),
           TRUE);
+      if (GST_IS_V4L2SRC (obj->element) == TRUE) {
+#ifdef CONT_FRAME_CAPTURE
+        /* FIXME: Incase downstream doesn't propose number of buffer to v4l2src
+         * (ex. tee, queue,...). Use default own_min = 5 (equal number of
+         * buffer on Renesas omx videoencoder)
+         */
+        own_min = 5;
+#endif
+      }
     } else {
       gst_v4l2_buffer_pool_copy_at_threshold (GST_V4L2_BUFFER_POOL (pool),
           FALSE);
