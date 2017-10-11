@@ -90,6 +90,8 @@ option('v4l2', type : 'feature', value : 'auto', description : 'Build video4linu
 option('v4l2-probe', type : 'boolean', value : true, description : 'Probe v4l2 devices when the v4l2 plugin is loaded')
 option('v4l2-libv4l2', type : 'feature', value : 'auto', description : 'Use libv4l2 for some obscure format conversions')
 option('v4l2-gudev', type : 'feature', value : 'auto', description : 'Use libgudev for probing v4l2 devices')
+option('ignore-fps-of-video-standard', type: 'boolean', value : 'false', description : 'Ignore video standard framerate when norm option is 0')
+option('cont-frame-capture', type: 'boolean', value : 'false', description : 'Enable continuous frame capture mode')
 
 # Common feature options
 option('examples', type : 'feature', value : 'auto', yield : true)

@@ -891,6 +891,12 @@ gst_v4l2_set_defaults (GstV4l2Object * v4l2object)
           gst_v4l2_tuner_get_std_id_by_norm (v4l2object, norm);
       gst_tuner_norm_changed (tuner, norm);
     }
+#ifdef IGNORE_FPS_STANDARD
+    if (GST_IS_V4L2SRC (v4l2object->element) == TRUE) {
+      /* Keep v4l2object->tv_norm = 0 eventhough can get norm value from driver */
+      v4l2object->tv_norm = 0;
+    }
+#endif
   }
 
   if (v4l2object->channel)
@@ -3558,6 +3564,10 @@ gst_v4l2_object_set_format_full (GstV4l2Object * v4l2object, GstCaps * caps,
   GstVideoInfo info;
   GstVideoAlignment align;
   gint width, height, fps_n, fps_d;
+#ifdef IGNORE_FPS_STANDARD
+  gint tmpfps_n = 0;
+  gint tmpfps_d = 0;
+#endif
   gint n_v4l_planes;
   gint i = 0;
   gboolean is_mplane;
@@ -3590,6 +3600,12 @@ gst_v4l2_object_set_format_full (GstV4l2Object * v4l2object, GstCaps * caps,
   height = GST_VIDEO_INFO_FIELD_HEIGHT (&info);
   fps_n = GST_VIDEO_INFO_FPS_N (&info);
   fps_d = GST_VIDEO_INFO_FPS_D (&info);
+#ifdef IGNORE_FPS_STANDARD
+  if (GST_IS_V4L2SRC (v4l2object->element) == TRUE) {
+    tmpfps_n = fps_n;
+    tmpfps_d = fps_d;
+  }
+#endif
 
   /* if encoded format (GST_VIDEO_INFO_N_PLANES return 0)
    * or if contiguous is preferred */
@@ -4053,6 +4069,12 @@ gst_v4l2_object_set_format_full (GstV4l2Object * v4l2object, GstCaps * caps,
   }
 
 done:
+#ifdef IGNORE_FPS_STANDARD
+  if (GST_IS_V4L2SRC (v4l2object->element) == TRUE) {
+    GST_VIDEO_INFO_FPS_N (&info) = tmpfps_n;
+    GST_VIDEO_INFO_FPS_D (&info) = tmpfps_d;
+  }
+#endif
   /* add boolean return, so we can fail on drivers bugs */
   gst_v4l2_object_save_format (v4l2object, fmtdesc, &format, &info, &align);
 
