@@ -560,6 +560,26 @@ gst_v4l2src_set_format (GstV4l2Src * v4l2src, GstCaps * caps,
   return gst_v4l2_object_set_format (obj, caps, error);
 }
 
+static gboolean
+gst_v4l2src_get_input_size_info (GstV4l2Src * src)
+{
+  GstV4l2Object *obj;
+  struct v4l2_cropcap cropcap = { 0 };
+
+  obj = src->v4l2object;
+
+  /* Currently, get information of input resolution through cropcap callback */
+  cropcap.type = obj->type;
+  if (obj->ioctl (src->v4l2object->video_fd, VIDIOC_CROPCAP, &cropcap) < 0) {
+    GST_ERROR_OBJECT (src, "Cropcap fail, CROPCAP has not supported");
+    return FALSE;
+  }
+  src->in_size.width = cropcap.defrect.width;
+  src->in_size.height = cropcap.defrect.height;
+
+  return TRUE;
+}
+
 static GstCaps *
 gst_v4l2src_fixate (GstBaseSrc * basesrc, GstCaps * caps,
     struct PreferredCapsInfo *pref)
@@ -571,8 +591,15 @@ gst_v4l2src_fixate (GstBaseSrc * basesrc, GstCaps * caps,
   gint i = G_MAXINT;
   GstV4l2Error error = GST_V4L2_ERROR_INIT;
   GstCaps *fcaps = NULL;
+  gboolean ret;
 
   GST_DEBUG_OBJECT (basesrc, "Fixating caps %" GST_PTR_FORMAT, caps);
+
+  ret = gst_v4l2src_get_input_size_info (v4l2src);
+  if (ret) {
+    pref->width = v4l2src->in_size.width;
+    pref->height = v4l2src->in_size.height;
+  }
   GST_DEBUG_OBJECT (basesrc, "Preferred size %ix%i", pref->width, pref->height);
 
   /* Sort the structures to get the caps that is nearest to our preferences,

@@ -63,6 +63,7 @@ struct _GstV4l2Src
   guint64 renegotiation_adjust;
 
   GstClockTime ctrl_time;
+  struct v4l2_rect in_size;
 
   gboolean pending_set_fmt;
 
