@@ -2,6 +2,7 @@
  * Copyright (C) 2011, Hewlett-Packard Development Company, L.P.
  * Copyright (C) 2017 Xilinx, Inc.
  *   Author: Sebastian Dröge <sebastian.droege@collabora.co.uk>, Collabora Ltd.
+ * Copyright (C) 2017, Renesas Electronics Corporation
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,7 +27,12 @@
 #include <gst/gst.h>
 
 #include "gstomxh265dec.h"
+#ifndef USE_OMX_TARGET_RCAR
 #include "gstomxh265utils.h"
+#endif
+#ifdef HAVE_H265DEC_EXT
+#include "OMXR_Extension_h265d.h"
+#endif
 
 GST_DEBUG_CATEGORY_STATIC (gst_omx_h265_dec_debug_category);
 #define GST_CAT_DEFAULT gst_omx_h265_dec_debug_category
@@ -51,19 +57,29 @@ enum
 G_DEFINE_TYPE_WITH_CODE (GstOMXH265Dec, gst_omx_h265_dec,
     GST_TYPE_OMX_VIDEO_DEC, DEBUG_INIT);
 
-#define MAKE_CAPS(alignment) \
+#define MAKE_CAPS(alignment, ...) \
    "video/x-h265, " \
       "alignment=(string) " alignment ", " \
       "stream-format=(string) byte-stream, " \
-      "width=(int) [1,MAX], height=(int) [1,MAX]"
+      "width=(int) [1,MAX], height=(int) [1,MAX]" __VA_ARGS__
 
 /* The Zynq MPSoC supports decoding subframes though we want "au" to be the
  * default, so we keep it prepended. This is the only way that it works with
  * rtph265depay. */
 #ifdef USE_OMX_TARGET_ZYNQ_USCALE_PLUS
+#ifdef USE_OMX_TARGET_RCAR
+#define SINK_CAPS \
+    MAKE_CAPS("au", ", parsed=(boolean) true") ";" \
+    MAKE_CAPS("nal", ", parsed=(boolean) true")
+#else
 #define SINK_CAPS MAKE_CAPS ("au") ";" MAKE_CAPS ("nal");
+#endif
+#else
+#ifdef USE_OMX_TARGET_RCAR
+#define SINK_CAPS MAKE_CAPS("au", ", parsed=(boolean) true")
 #else
 #define SINK_CAPS MAKE_CAPS ("au")
+#endif
 #endif
 
 static void
@@ -96,6 +112,7 @@ static gboolean
 gst_omx_h265_dec_is_format_change (GstOMXVideoDec * dec,
     GstOMXPort * port, GstVideoCodecState * state)
 {
+#ifndef USE_OMX_TARGET_RCAR
   GstCaps *old_caps = NULL;
   GstCaps *new_caps = state->caps;
   GstStructure *old_structure, *new_structure;
@@ -127,10 +144,12 @@ gst_omx_h265_dec_is_format_change (GstOMXVideoDec * dec,
       || g_strcmp0 (old_alignment, new_alignment) != 0) {
     return TRUE;
   }
+#endif
 
   return FALSE;
 }
 
+#ifndef USE_OMX_TARGET_RCAR
 static gboolean
 set_profile_and_level (GstOMXH265Dec * self, GstVideoCodecState * state)
 {
@@ -191,17 +210,21 @@ unsupported_level:
   GST_ERROR_OBJECT (self, "Unsupported level %s", level_string);
   return FALSE;
 }
+#endif
 
 static gboolean
 gst_omx_h265_dec_set_format (GstOMXVideoDec * dec, GstOMXPort * port,
     GstVideoCodecState * state)
 {
+#ifndef USE_OMX_TARGET_RCAR
   GstOMXVideoDecClass *klass = GST_OMX_VIDEO_DEC_GET_CLASS (dec);
+#endif
   OMX_PARAM_PORTDEFINITIONTYPE port_def;
   OMX_ERRORTYPE err;
   const GstStructure *s;
 
   gst_omx_port_get_port_definition (port, &port_def);
+#ifndef USE_OMX_TARGET_RCAR
   port_def.format.video.eCompressionFormat =
       (OMX_VIDEO_CODINGTYPE) OMX_VIDEO_CodingHEVC;
   err = gst_omx_port_update_port_definition (port, &port_def);
@@ -219,6 +242,16 @@ gst_omx_h265_dec_set_format (GstOMXVideoDec * dec, GstOMXPort * port,
       && gst_omx_port_set_subframe (dec->dec_in_port, TRUE)) {
     gst_video_decoder_set_subframe_mode (GST_VIDEO_DECODER (dec), TRUE);
   }
+
+  return TRUE;
+#endif
+
+#ifdef HAVE_H265DEC_EXT
+  port_def.format.video.eCompressionFormat = OMXR_MC_VIDEO_CodingHEVC;
+#endif
+  err = gst_omx_port_update_port_definition (port, &port_def);
+  if (err != OMX_ErrorNone)
+    return FALSE;
 
   return TRUE;
 }
