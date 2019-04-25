@@ -499,8 +499,10 @@ gst_v4l2_allocator_probe (GstV4l2Allocator * allocator, guint32 memory,
     bcreate.memory = memory;
     bcreate.format = obj->format;
 
-    if ((obj->ioctl (obj->video_fd, VIDIOC_CREATE_BUFS, &bcreate) == 0))
-      flags |= bcreate_flag;
+    if (!obj->disable_dynamic_buffer_alloc) {
+      if ((obj->ioctl (obj->video_fd, VIDIOC_CREATE_BUFS, &bcreate) == 0))
+        flags |= bcreate_flag;
+    }
   }
 
   if (breq.capabilities & V4L2_BUF_CAP_SUPPORTS_ORPHANED_BUFS)
