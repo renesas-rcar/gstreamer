@@ -54,6 +54,7 @@ GST_DEBUG_CATEGORY_EXTERN (v4l2_debug);
 #define DEFAULT_PROP_FLAGS              0
 #define DEFAULT_PROP_TV_NORM            0
 #define DEFAULT_PROP_IO_MODE            GST_V4L2_IO_AUTO
+#define DEFAULT_PROP_DISABLE_DYNAMIC_BUFFER_ALLOC    FALSE
 
 #define ENCODED_BUFFER_SIZE             (2 * 1024 * 1024)
 
@@ -323,6 +324,13 @@ gst_v4l2_object_install_properties_helper (GObjectClass * gobject_class,
       g_param_spec_flags ("flags", "Flags", "Device type flags",
           GST_TYPE_V4L2_DEVICE_FLAGS, DEFAULT_PROP_FLAGS,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class,
+      PROP_DISABLE_DYNAMIC_BUFFER_ALLOC,
+      g_param_spec_boolean ("disable-dynamic-buffer-alloc",
+          "Disable dynamic buffer allocation",
+          "Flag for handling dynamic buffer allocation",
+          DEFAULT_PROP_DISABLE_DYNAMIC_BUFFER_ALLOC,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
    * GstV4l2Src:brightness:
@@ -522,6 +530,9 @@ gst_v4l2_object_new (GstElement * element,
 
   v4l2object->no_initial_format = FALSE;
 
+  v4l2object->disable_dynamic_buffer_alloc =
+      DEFAULT_PROP_DISABLE_DYNAMIC_BUFFER_ALLOC;
+
   /* We now disable libv4l2 by default, but have an env to enable it. */
 #ifdef HAVE_LIBV4L2
   if (g_getenv ("GST_V4L2_USE_LIBV4L2")) {
@@ -714,6 +725,9 @@ gst_v4l2_object_set_property_helper (GstV4l2Object * v4l2object,
     case PROP_FORCE_ASPECT_RATIO:
       v4l2object->keep_aspect = g_value_get_boolean (value);
       break;
+    case PROP_DISABLE_DYNAMIC_BUFFER_ALLOC:
+      v4l2object->disable_dynamic_buffer_alloc = g_value_get_boolean (value);
+      break;
     default:
       return FALSE;
       break;
@@ -810,6 +824,9 @@ gst_v4l2_object_get_property_helper (GstV4l2Object * v4l2object,
       break;
     case PROP_FORCE_ASPECT_RATIO:
       g_value_set_boolean (value, v4l2object->keep_aspect);
+      break;
+    case PROP_DISABLE_DYNAMIC_BUFFER_ALLOC:
+      g_value_set_boolean (value, v4l2object->disable_dynamic_buffer_alloc);
       break;
     default:
       return FALSE;
