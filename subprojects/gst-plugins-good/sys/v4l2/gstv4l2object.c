@@ -5166,6 +5166,17 @@ gst_v4l2_object_decide_allocation (GstV4l2Object * obj, GstQuery * query)
         GST_BUFFER_POOL_OPTION_VIDEO_META);
   }
 
+  GST_INFO_OBJECT (obj->element, "Number of buffer allocated %d", own_min);
+  if ((GST_IS_V4L2SRC (obj->element) == TRUE) &&
+      (GST_V4L2SRC (obj->element)->num_alloc_buffer != 0xffffffff)) {
+    if ((obj->mode == GST_V4L2_IO_MMAP) || (obj->mode == GST_V4L2_IO_DMABUF)) {
+      own_min = MAX (own_min, GST_V4L2SRC (obj->element)->num_alloc_buffer);
+
+      GST_INFO_OBJECT (obj->element,
+          "Number of buffer allocated changed to %d", own_min);
+    }
+  }
+
   gst_buffer_pool_config_set_allocator (config, allocator, &params);
   gst_buffer_pool_config_set_params (config, caps, size, own_min, 0);
 
