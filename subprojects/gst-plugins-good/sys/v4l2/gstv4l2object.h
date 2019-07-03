@@ -248,7 +248,8 @@ GType gst_v4l2_object_get_type (void);
     PROP_EXTRA_CONTROLS,      \
     PROP_PIXEL_ASPECT_RATIO,  \
     PROP_FORCE_ASPECT_RATIO,  \
-    PROP_DISABLE_DYNAMIC_BUFFER_ALLOC
+    PROP_DISABLE_DYNAMIC_BUFFER_ALLOC, \
+    PROP_NO_RESURECT_BUF
 
 /* create/destroy */
 GstV4l2Object*  gst_v4l2_object_new       (GstElement * element,
