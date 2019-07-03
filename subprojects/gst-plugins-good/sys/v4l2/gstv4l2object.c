@@ -55,6 +55,7 @@ GST_DEBUG_CATEGORY_EXTERN (v4l2_debug);
 #define DEFAULT_PROP_TV_NORM            0
 #define DEFAULT_PROP_IO_MODE            GST_V4L2_IO_AUTO
 #define DEFAULT_PROP_DISABLE_DYNAMIC_BUFFER_ALLOC    FALSE
+#define DEFAULT_PROP_NO_RESURECT_BUF    FALSE
 
 #define ENCODED_BUFFER_SIZE             (2 * 1024 * 1024)
 
@@ -331,6 +332,13 @@ gst_v4l2_object_install_properties_helper (GObjectClass * gobject_class,
           "Flag for handling dynamic buffer allocation",
           DEFAULT_PROP_DISABLE_DYNAMIC_BUFFER_ALLOC,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_NO_RESURECT_BUF,
+      g_param_spec_boolean ("no-resurect-buf",
+          "Disable dynamic buffer allocation",
+          "Flag for handling dynamic buffer allocation "
+          "(deprecated, now use disable-dynamic-buffer-alloc)",
+          DEFAULT_PROP_NO_RESURECT_BUF,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_DEPRECATED));
 
   /**
    * GstV4l2Src:brightness:
@@ -725,6 +733,10 @@ gst_v4l2_object_set_property_helper (GstV4l2Object * v4l2object,
     case PROP_FORCE_ASPECT_RATIO:
       v4l2object->keep_aspect = g_value_get_boolean (value);
       break;
+    case PROP_NO_RESURECT_BUF:
+      GST_WARNING ("The option \"no-resurect-buf\" is deprecated."
+          " Now use the option \"disable_dynamic_buffer_alloc\"");
+      /* fall-through */
     case PROP_DISABLE_DYNAMIC_BUFFER_ALLOC:
       v4l2object->disable_dynamic_buffer_alloc = g_value_get_boolean (value);
       break;
@@ -825,6 +837,8 @@ gst_v4l2_object_get_property_helper (GstV4l2Object * v4l2object,
     case PROP_FORCE_ASPECT_RATIO:
       g_value_set_boolean (value, v4l2object->keep_aspect);
       break;
+    case PROP_NO_RESURECT_BUF:
+      /* fall-through */
     case PROP_DISABLE_DYNAMIC_BUFFER_ALLOC:
       g_value_set_boolean (value, v4l2object->disable_dynamic_buffer_alloc);
       break;
