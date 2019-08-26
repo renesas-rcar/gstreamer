@@ -70,6 +70,7 @@ struct _GstWaylandSink
 
   struct wl_callback *callback;
   struct wl_event_queue *frame_queue;
+  gboolean use_subsurface;
 };
 
 struct _GstWaylandSinkClass
