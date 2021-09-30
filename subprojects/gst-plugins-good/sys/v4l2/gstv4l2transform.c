@@ -226,10 +226,10 @@ gst_v4l2_transform_set_caps (GstBaseTransform * trans, GstCaps * incaps,
     goto outcaps_failed;
 
   /* FIXME implement fallback if crop not supported */
-  if (!gst_v4l2_object_set_crop (self->v4l2output))
+  if (!gst_v4l2_object_setup_padding (self->v4l2output))
     goto failed;
 
-  if (!gst_v4l2_object_set_crop (self->v4l2capture))
+  if (!gst_v4l2_object_setup_padding (self->v4l2capture))
     goto failed;
 
   return TRUE;
