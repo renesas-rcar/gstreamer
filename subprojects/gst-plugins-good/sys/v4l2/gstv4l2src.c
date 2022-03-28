@@ -79,6 +79,8 @@ enum
   PROP_CROP_BOTTOM,
   PROP_CROP_RIGHT,
   PROP_CROP_BOUNDS,
+  PROP_CROP_WIDTH,	/* deprecated */
+  PROP_CROP_HEIGHT,	/* deprecated */
   PROP_NUM_ALLOC_BUF,
   PROP_LAST
 };
@@ -248,6 +250,18 @@ gst_v4l2src_class_init (GstV4l2SrcClass * klass)
           0, G_MAXUINT, DEFAULT_NUM_ALLOC_BUF,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  /** for backward compatibility:
+   *  crop-width and crop-height
+   */
+  g_object_class_install_property (gobject_class, PROP_CROP_WIDTH,
+      g_param_spec_uint ("crop-width", "Crop width size (deprecated)",
+          "Width of the CROP area. 0: Equal with input width",
+          0, G_MAXUINT, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_CROP_HEIGHT,
+      g_param_spec_uint ("crop-height", "Crop height size (deprecated)",
+          "Height of the CROP area. 0: Equal with input height",
+          0, G_MAXUINT, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   /**
    * GstV4l2Src::prepare-format:
    * @v4l2src: the v4l2src instance
@@ -341,6 +355,16 @@ gst_v4l2src_set_property (GObject * object,
       case PROP_CROP_RIGHT:
         v4l2src->crop_right = g_value_get_uint (value);
         break;
+      case PROP_CROP_WIDTH:
+        v4l2src->crop_width = g_value_get_uint (value);
+	GST_WARNING_OBJECT(v4l2src, "The option \"crop-width\" is deprecated."
+			   " Please use \"crop-right\".");
+        break;
+      case PROP_CROP_HEIGHT:
+        v4l2src->crop_height = g_value_get_uint(value);
+	GST_WARNING_OBJECT(v4l2src, "The option \"crop-height\" is deprecated."
+			   " Please use \"crop-bottom\".");
+        break;
       case PROP_NUM_ALLOC_BUF:
         v4l2src->num_alloc_buffer = g_value_get_uint (value);
         break;
@@ -397,6 +421,12 @@ gst_v4l2src_get_property (GObject * object,
         break;
       case PROP_CROP_BOUNDS:
         gst_v4l2src_set_rect_value (value, &v4l2src->crop_bounds);
+        break;
+      case PROP_CROP_WIDTH:
+        g_value_set_uint (value, v4l2src->crop_width);
+        break;
+      case PROP_CROP_HEIGHT:
+        g_value_set_uint (value, v4l2src->crop_height);
         break;
       case PROP_NUM_ALLOC_BUF:
         g_value_set_uint (value, v4l2src->num_alloc_buffer);
@@ -784,11 +814,23 @@ gst_v4l2src_setup_source_crop (GstV4l2Src * v4l2src,
   if (!gst_v4l2_object_get_crop_bounds (v4l2src->v4l2object, crop_bounds))
     return FALSE;
 
+  if ((v4l2src->crop_right && v4l2src->crop_width) ||
+      (v4l2src->crop_bottom && v4l2src->crop_height)) {
+    GST_ERROR_OBJECT(v4l2src, "Don't use crop-width and crop-right at the same "
+		     "time, the same applies to crop-height and crop-bottom.");
+    return FALSE;
+  }
+
   g_object_notify (G_OBJECT (v4l2src), "crop-bounds");
 
   cropped_width = crop_bounds->width - v4l2src->crop_left - v4l2src->crop_right;
   cropped_height =
       crop_bounds->height - v4l2src->crop_top - v4l2src->crop_bottom;
+
+  if (v4l2src->crop_width)
+    cropped_width = v4l2src->crop_width;
+  if (v4l2src->crop_height)
+    cropped_height = v4l2src->crop_height;
 
   if (v4l2src->crop_left < crop_bounds->left
       || v4l2src->crop_top < crop_bounds->top
