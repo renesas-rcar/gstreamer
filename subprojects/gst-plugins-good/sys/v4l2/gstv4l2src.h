@@ -71,6 +71,10 @@ struct _GstV4l2Src
   guint crop_left;
   guint crop_bottom;
   guint crop_right;
+  /* for backward compatibility */
+  guint crop_width;
+  guint crop_height;
+
   /* Set it to change number of buffer request for V4l2 */
   guint num_alloc_buffer;
 
