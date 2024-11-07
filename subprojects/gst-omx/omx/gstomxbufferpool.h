@@ -67,7 +67,7 @@ struct _GstOMXBufferPool
   GstOMXPort *port;
 
   /* For handling OpenMAX allocated memory */
-  GstOMXAllocator *allocator;
+  GstAllocator *allocator;
 
   /* Set from outside this pool */
   /* TRUE if the pool is not used anymore */
@@ -86,6 +86,13 @@ struct _GstOMXBufferPool
 
   /* The type of buffers produced by the decoder */
   GstOMXBufferMode output_mode;
+
+#ifdef USE_RCAR_DMABUF
+  /* Array use to contain dma_id. It is used in export_end dmabuf area */
+  GArray *id_array;
+  /* Array use to contain physical address. It is used in dynamic change, seeking case */
+  GArray *physadd_array;
+#endif
 };
 
 struct _GstOMXBufferPoolClass

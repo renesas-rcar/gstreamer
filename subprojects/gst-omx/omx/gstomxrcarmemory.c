@@ -106,10 +106,11 @@ gst_omx_rcar_import_dmabuf (GstOMXBuffer * buf, GstBuffer * input_buffer)
   gint i;
   gint ret;
   OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE *ext_addr;
+  GstVideoMeta *vmeta;
 
   ext_addr = (OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE *) buf->omx_buf->pBuffer;
 
-  GstVideoMeta *vmeta = gst_buffer_get_video_meta (input_buffer);
+  vmeta = gst_buffer_get_video_meta (input_buffer);
   if (vmeta)
     n_mem = vmeta->n_planes;
   else
