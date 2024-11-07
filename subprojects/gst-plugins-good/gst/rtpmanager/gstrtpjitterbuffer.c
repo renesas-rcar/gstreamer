@@ -1089,6 +1089,16 @@ gst_rtp_jitter_buffer_init (GstRtpJitterBuffer * jitterbuffer)
 }
 
 static void
+free_item (RTPJitterBufferItem * item)
+{
+  g_return_if_fail (item != NULL);
+
+  if (item->data && item->type != ITEM_TYPE_QUERY)
+    gst_mini_object_unref (item->data);
+  g_slice_free (RTPJitterBufferItem, item);
+}
+
+static void
 free_item_and_retain_sticky_events (RTPJitterBufferItem * item,
     gpointer user_data)
 {
@@ -1119,6 +1129,8 @@ gst_rtp_jitter_buffer_finalize (GObject * object)
   g_cond_clear (&priv->jbuf_timer);
   g_cond_clear (&priv->jbuf_event);
   g_cond_clear (&priv->jbuf_query);
+
+  rtp_jitter_buffer_set_item_free_func (priv->jbuf, (GFunc) free_item);
 
   rtp_jitter_buffer_flush (priv->jbuf, NULL, NULL);
   g_queue_foreach (&priv->gap_packets, (GFunc) gst_buffer_unref, NULL);
