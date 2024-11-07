@@ -833,7 +833,7 @@ retry_find_plane:
 #ifdef HAVE_MMNGR
   if (self->write_back) {
     gint32 mmngr_ret = R_MM_OK;
-    MMNGR_ID pid;
+    // MMNGR_ID pid;
     size_t screen_size;
     unsigned int flag = MMNGR_VA_SUPPORT;
     self->wb_buff.pid = -1;

@@ -6,6 +6,8 @@
  *  Víctor Manuel Jáquez Leal <vjaquez@igalia.com>
  *  Javier Martin <javiermartin@by.com.es>
  *
+ * Copyright (C) 2021 Renesas Electronics Corporation
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License as published by the Free Software Foundation; either
@@ -159,13 +161,13 @@ gst_drm_height_from_drm (guint32 drmfmt, guint32 height)
   switch (drmfmt) {
     case DRM_FORMAT_YUV420:
     case DRM_FORMAT_YVU420:
-    case DRM_FORMAT_YUV422:
     case DRM_FORMAT_NV12:
     case DRM_FORMAT_NV21:
     case DRM_FORMAT_P010:
     case DRM_FORMAT_P016:
       ret = height * 3 / 2;
       break;
+    case DRM_FORMAT_YUV422:
     case DRM_FORMAT_NV16:
     case DRM_FORMAT_NV61:
       ret = height * 2;

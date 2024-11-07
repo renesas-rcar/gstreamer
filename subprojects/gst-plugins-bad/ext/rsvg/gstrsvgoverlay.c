@@ -161,14 +161,17 @@ gst_rsvg_overlay_set_svg_data (GstRsvgOverlay * overlay, const gchar * data,
           GST_ERROR_OBJECT (overlay, "Cannot read SVG data: %s", data);
         }
       } else {
-        /* Get SVG dimension. */
-        RsvgDimensionData svg_dimension;
-        rsvg_handle_get_dimensions (overlay->handle, &svg_dimension);
-        overlay->svg_width = svg_dimension.width;
-        overlay->svg_height = svg_dimension.height;
-        gst_base_transform_set_passthrough (btrans, FALSE);
-        GST_INFO_OBJECT (overlay, "updated SVG, %d x %d", overlay->svg_width,
-            overlay->svg_height);
+        /* Get SVG intrinsic size in pixels. */
+        gdouble svg_width, svg_height;
+        if (rsvg_handle_get_intrinsic_size_in_pixels(overlay->handle, &svg_width, &svg_height)) {
+          overlay->svg_width = (gint)svg_width;
+          overlay->svg_height = (gint)svg_height;
+          gst_base_transform_set_passthrough (btrans, FALSE);
+          GST_INFO_OBJECT (overlay, "updated SVG, %d x %d", overlay->svg_width, overlay->svg_height);
+        } else {
+          GST_WARNING_OBJECT (overlay, "Could not get SVG intrinsic size.");
+          gst_base_transform_set_passthrough (btrans, TRUE);
+        }
       }
     }
   }
@@ -364,6 +367,8 @@ gst_rsvg_overlay_transform_frame_ip (GstVideoFilter * vfilter,
   GstRsvgOverlay *overlay = GST_RSVG_OVERLAY (vfilter);
   cairo_surface_t *surface;
   cairo_t *cr;
+  RsvgRectangle viewport;
+  GError *error = NULL;
   double applied_x_offset = (double) overlay->x_offset;
   double applied_y_offset = (double) overlay->y_offset;
   int applied_width = overlay->width;
@@ -411,7 +416,7 @@ gst_rsvg_overlay_transform_frame_ip (GstVideoFilter * vfilter,
   /* Scale when necessary, i.e. an absolute or relative dimension has been specified. */
   if ((applied_width || applied_height) && overlay->svg_width
       && overlay->svg_height) {
-    /* If may happen that only one of the dimension is specified. Use
+    /* If may happen that only one of the dimensions is specified. Use
        the original SVG size for the other dimension. */
     if (!applied_width)
       applied_width = overlay->svg_width;
@@ -421,7 +426,23 @@ gst_rsvg_overlay_transform_frame_ip (GstVideoFilter * vfilter,
     cairo_scale (cr, (double) applied_width / overlay->svg_width,
         (double) applied_height / overlay->svg_height);
   }
-  rsvg_handle_render_cairo (overlay->handle, cr);
+
+  /* Define the viewport for rendering */
+  viewport.x = applied_x_offset;
+  viewport.y = applied_y_offset;
+  viewport.width = applied_width;
+  viewport.height = applied_height;
+
+  /* Render the SVG document */
+  if (!rsvg_handle_render_document(overlay->handle, cr, &viewport, &error)) {
+    if (error) {
+      GST_ERROR_OBJECT(overlay, "Error rendering SVG document: %s", error->message);
+      g_error_free(error);
+    } else {
+      GST_ERROR_OBJECT(overlay, "Unknown error rendering SVG document.");
+    }
+  }
+
   GST_RSVG_UNLOCK (overlay);
 
   cairo_destroy (cr);
