@@ -33,6 +33,7 @@
 #include "gstomxvideo.h"
 #include "gstomxvideoenc.h"
 
+#include "mmngr_buf_user_public.h"
 #if defined (HAVE_MMNGRBUF) && defined (HAVE_VIDEOR_EXT)
 #define USE_RCAR_DMABUF_IMPORT
 #endif
@@ -284,7 +285,7 @@ static gboolean gst_omx_video_enc_set_format (GstVideoEncoder * encoder,
 static gboolean gst_omx_video_enc_flush (GstVideoEncoder * encoder);
 static GstFlowReturn gst_omx_video_enc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame);
-static gboolean gst_omx_video_enc_finish (GstVideoEncoder * encoder);
+static GstFlowReturn gst_omx_video_enc_finish (GstVideoEncoder * encoder);
 static gboolean gst_omx_video_enc_propose_allocation (GstVideoEncoder * encoder,
     GstQuery * query);
 static GstCaps *gst_omx_video_enc_getcaps (GstVideoEncoder * encoder,
@@ -631,8 +632,11 @@ gst_omx_video_enc_init (GstOMXVideoEnc * self)
   self->no_copy = FALSE;
   self->import_dmabuf = FALSE;
 #ifdef USE_RCAR_DMABUF_IMPORT
+  self->fd_table_array = g_array_new (FALSE, FALSE, sizeof (fd_table));
+  self->id_array = g_array_new (FALSE, FALSE, sizeof (gint));
   self->extaddr_array =
       g_array_new (FALSE, FALSE, sizeof (OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE));
+  self->isSingleFactory = TRUE;
 #endif
 
 #ifdef USE_OMX_TARGET_ZYNQ_USCALE_PLUS
@@ -1027,6 +1031,18 @@ gst_omx_video_enc_open (GstVideoEncoder * encoder)
   GstOMXVideoEncClass *klass = GST_OMX_VIDEO_ENC_GET_CLASS (self);
   gint in_port_index, out_port_index;
 
+ #ifdef USE_RCAR_DMABUF_IMPORT
+  GstElementFactory *factory = NULL;
+  factory = gst_element_factory_find ("vspfilter");
+
+  if (factory) {
+    if(g_type_name(gst_element_factory_get_element_type(factory))){
+      self->isSingleFactory = FALSE;
+    }
+    gst_object_unref (factory);
+  }
+#endif
+
   self->enc =
       gst_omx_component_new (GST_OBJECT_CAST (self), klass->cdata.core_name,
       klass->cdata.component_name, klass->cdata.component_role,
@@ -1216,10 +1232,6 @@ gst_omx_video_enc_close (GstVideoEncoder * encoder)
 
   self->started = FALSE;
 
-#ifdef USE_RCAR_DMABUF_IMPORT
-  g_array_set_size (self->extaddr_array, 0);
-#endif
-
   return TRUE;
 }
 
@@ -1232,6 +1244,8 @@ gst_omx_video_enc_finalize (GObject * object)
   g_cond_clear (&self->drain_cond);
 
 #ifdef USE_RCAR_DMABUF_IMPORT
+  g_array_free (self->fd_table_array, TRUE);
+  g_array_free (self->id_array, TRUE);
   g_array_free (self->extaddr_array, TRUE);
 #endif
 
@@ -2054,6 +2068,14 @@ gst_omx_video_enc_stop (GstVideoEncoder * encoder)
 
   gst_omx_component_get_state (self->enc, 5 * GST_SECOND);
 
+#ifdef USE_RCAR_DMABUF_IMPORT
+  for (gint i = 0; i < self->id_array->len; i++)
+    mmngr_import_end_in_user_ext (g_array_index (self->id_array, gint, i));
+  g_array_set_size (self->fd_table_array, 0);
+  g_array_set_size (self->id_array, 0);
+  g_array_set_size (self->extaddr_array, 0);
+#endif
+
   return TRUE;
 }
 
@@ -2440,15 +2462,6 @@ gst_omx_video_enc_set_to_idle (GstOMXVideoEnc * self)
   return TRUE;
 }
 
-static GstOMXBuffer *
-get_omx_buf (GstBuffer * buffer)
-{
-  GstMemory *mem;
-
-  mem = gst_buffer_peek_memory (buffer, 0);
-  return gst_omx_memory_get_omx_buf (mem);
-}
-
 static gboolean
 buffer_is_from_input_pool (GstOMXVideoEnc * self, GstBuffer * buffer)
 {
@@ -2456,7 +2469,7 @@ buffer_is_from_input_pool (GstOMXVideoEnc * self, GstBuffer * buffer)
    * with our input port. */
   GstOMXBuffer *buf;
 
-  buf = get_omx_buf (buffer);
+  buf = gst_omx_buffer_get_omx_buf (buffer);
   if (!buf)
     return FALSE;
 
@@ -2547,6 +2560,57 @@ gst_omx_video_enc_set_use_buffer (GstOMXVideoEnc * self)
   return TRUE;
 }
 
+static gboolean
+mmngr_import_dmabuf (GstOMXVideoEnc * self, gint fd, gint * id,
+    guint * phys_addr)
+{
+  gsize size;
+  gint ret;
+
+  ret = mmngr_import_start_in_user_ext (id, &size, phys_addr, fd, NULL);
+  if (ret != R_MM_OK) {
+    GST_ERROR_OBJECT (self, "Fail to import dmabuf fd");
+    return FALSE;
+  }
+
+  GST_DEBUG_OBJECT (self, "Got physical address 0x%x at fd %d", *phys_addr, fd);
+
+  return TRUE;
+}
+
+static gboolean
+register_input_buffer (GstOMXVideoEnc * self,
+    OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE * ext_addr, GstBuffer * input_buffer)
+{
+  guint n_mem;
+  gint i;
+  gint fd[GST_VIDEO_MAX_PLANES];
+  fd_table table;
+
+  n_mem = gst_buffer_n_memory (input_buffer);
+  for (i = 0; i < n_mem; i++) {
+    GstMemory *mem;
+    gint id[GST_VIDEO_MAX_PLANES];
+    guint phys_addr[GST_VIDEO_MAX_PLANES] = { 0, };
+
+    mem = gst_buffer_peek_memory (input_buffer, i);
+    fd[i] = gst_dmabuf_memory_get_fd (mem);
+
+    if (!mmngr_import_dmabuf (self, fd[i], &id[i], &phys_addr[i])) {
+      GST_ERROR_OBJECT (self, "Failed to mmngr_import_dmabuf");
+      return FALSE;
+    }
+
+    ext_addr->u32HwipAddr[i] = phys_addr[i] + mem->offset;
+    g_array_append_val (self->id_array, id[i]);
+  }
+
+  table.fd = fd[0];
+  table.ext_addr = ext_addr;
+  g_array_append_val (self->fd_table_array, table);
+
+  return TRUE;
+}
 #endif
 
 static gboolean
@@ -3330,6 +3394,9 @@ gst_omx_video_enc_handle_frame (GstVideoEncoder * encoder,
   GstOMXBuffer *buf;
   OMX_ERRORTYPE err;
   GstClockTimeDiff deadline;
+#ifdef USE_RCAR_DMABUF_IMPORT
+  fd_table *table = NULL;
+#endif
 
   self = GST_OMX_VIDEO_ENC (encoder);
 
@@ -3363,6 +3430,34 @@ gst_omx_video_enc_handle_frame (GstVideoEncoder * encoder,
 
   port = self->enc_in_port;
 
+#ifdef USE_RCAR_DMABUF_IMPORT
+  if (self->import_dmabuf) {
+    GstMemory *mem;
+    gint fd;
+    gint i;
+
+    mem = gst_buffer_peek_memory (frame->input_buffer, 0);
+    fd = gst_dmabuf_memory_get_fd (mem);
+
+    for (i = 0; i < self->fd_table_array->len; i++) {
+      table = &g_array_index (self->fd_table_array, fd_table, i);
+
+      if (fd == table->fd)
+        break;
+      table = NULL;
+    }
+
+    if (!table
+        && self->fd_table_array->len == port->port_def.nBufferCountActual) {
+      GST_ERROR_OBJECT (self,
+          "Buffer out of guarantee of OMX MC, received %d, guarantee %d",
+          self->fd_table_array->len + 1, port->port_def.nBufferCountActual);
+      gst_video_codec_frame_unref (frame);
+      return GST_FLOW_ERROR;
+    }
+  }
+#endif
+
   while (acq_ret != GST_OMX_ACQUIRE_BUFFER_OK) {
     GstClockTime timestamp, duration;
     gboolean fill_buffer = TRUE;
@@ -3374,7 +3469,7 @@ gst_omx_video_enc_handle_frame (GstVideoEncoder * encoder,
 
     if (buffer_is_from_input_pool (self, frame->input_buffer)) {
       /* Receiving a buffer from our input pool */
-      buf = get_omx_buf (frame->input_buffer);
+      buf = gst_omx_buffer_get_omx_buf (frame->input_buffer);
 
       GST_LOG_OBJECT (self,
           "Input buffer %p already has a OMX buffer associated: %p",
@@ -3515,13 +3610,30 @@ gst_omx_video_enc_handle_frame (GstVideoEncoder * encoder,
 
 #ifdef USE_RCAR_DMABUF_IMPORT
     if (self->input_dmabuf) {
-      GstMemory *mem;
-      GstOMXRcarMemory *rcar_mem;
+      if (self->isSingleFactory) {
+        if (!gst_omx_rcar_compare_buffers(buf, frame->input_buffer)) {
+          g_queue_push_tail(&port->pending_buffers, buf);
+          acq_ret = GST_OMX_ACQUIRE_BUFFER_ERROR;
+          continue;
+        }
+      } else {
+        OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE *ext_addr;
 
-      if (!gst_omx_rcar_compare_buffers (buf, frame->input_buffer)) {
-        g_queue_push_tail (&port->pending_buffers, buf);
-        acq_ret = GST_OMX_ACQUIRE_BUFFER_ERROR;
-        continue;
+        ext_addr = (OMXR_MC_VIDEO_EXTEND_ADDRESSTYPE *)buf->omx_buf->pBuffer;
+
+        if ((table && (ext_addr != table->ext_addr)) || (!table &&
+                                                         ext_addr->u32HwipAddr[0])) {
+          g_queue_push_tail(&port->pending_buffers, buf);
+          acq_ret = GST_OMX_ACQUIRE_BUFFER_ERROR;
+          continue;
+        }
+
+        if (!table) {
+          if (!register_input_buffer(self, ext_addr, frame->input_buffer)) {
+            gst_video_codec_frame_unref(frame);
+            return GST_FLOW_ERROR;
+          }
+        }
       }
 
       buf->omx_buf->nFilledLen = port->port_def.nBufferSize;

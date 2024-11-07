@@ -122,6 +122,11 @@ struct _GstOMXVideoDec
   /* Set TRUE to crop as info of conf_win_left_offset and conf_win_top_offset */
   gboolean enable_crop;
 
+  /* Enabled when output caps re-negotiate */
+  gboolean dynamic_change;
+  gint dynamic_width;
+  gint dynamic_height;
+
   gboolean crop_set;
   crop_info cinfo;
 };
@@ -135,6 +140,7 @@ struct _GstOMXVideoDecClass
   gboolean (*is_format_change) (GstOMXVideoDec * self, GstOMXPort * port, GstVideoCodecState * state);
   gboolean (*set_format)       (GstOMXVideoDec * self, GstOMXPort * port, GstVideoCodecState * state);
   GstFlowReturn (*prepare_frame)   (GstOMXVideoDec * self, GstVideoCodecFrame *frame);
+  gboolean (*handle_dynamic_change) (GstOMXVideoDec * dec, GstOMXBuffer * buf);
 };
 
 GType gst_omx_video_dec_get_type (void);

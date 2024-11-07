@@ -221,7 +221,9 @@ gst_omx_h265_dec_set_format (GstOMXVideoDec * dec, GstOMXPort * port,
 #endif
   OMX_PARAM_PORTDEFINITIONTYPE port_def;
   OMX_ERRORTYPE err;
+#ifndef USE_OMX_TARGET_RCAR
   const GstStructure *s;
+#endif
 
   gst_omx_port_get_port_definition (port, &port_def);
 #ifndef USE_OMX_TARGET_RCAR

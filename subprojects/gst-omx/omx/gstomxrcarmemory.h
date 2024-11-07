@@ -35,6 +35,9 @@ struct _GstOMXRcarMemory
   GstOMXBuffer *omx_buf;
 };
 
+GQuark
+gst_omx_rcar_memory_quark (void);
+
 GstMemory *
 gst_omx_rcar_memory_alloc(GstAllocator *dmabuf_allocator, GstOMXBuffer *omx_buf);
 
