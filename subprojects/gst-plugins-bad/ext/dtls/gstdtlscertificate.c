@@ -191,12 +191,12 @@ static void
 init_generated (GstDtlsCertificate * self)
 {
   GstDtlsCertificatePrivate *priv = self->priv;
-  RSA *rsa;
   BIGNUM *serial_number;
   ASN1_INTEGER *asn1_serial_number;
   X509_NAME *name = NULL;
   gchar common_name[9] = { 0, };
   gint i;
+  EVP_PKEY_CTX *ctx = NULL;
 
   g_return_if_fail (!priv->x509);
   g_return_if_fail (!priv->private_key);
@@ -217,49 +217,36 @@ init_generated (GstDtlsCertificate * self)
     return;
   }
 
-  /* XXX: RSA_generate_key is actually deprecated in 0.9.8 */
-#if OPENSSL_VERSION_NUMBER < 0x10100001L
-  rsa = RSA_generate_key (2048, RSA_F4, NULL, NULL);
-#else
-  rsa = RSA_new ();
-  if (rsa != NULL) {
-    BIGNUM *e = BN_new ();
-    if (e == NULL || !BN_set_word (e, RSA_F4)
-        || !RSA_generate_key_ex (rsa, 2048, e, NULL)) {
-      RSA_free (rsa);
-      rsa = NULL;
-    }
-    if (e)
-      BN_free (e);
-  }
-#endif
-
-  if (!rsa) {
-    GST_WARNING_OBJECT (self, "failed to generate RSA");
-    EVP_PKEY_free (priv->private_key);
-    priv->private_key = NULL;
-    X509_free (priv->x509);
-    priv->x509 = NULL;
-    return;
+  // Use EVP_PKEY context for generating RSA keys
+  ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+  if (!ctx) {
+    GST_WARNING_OBJECT (self, "failed to create EVP_PKEY context");
+    goto cleanup;
   }
 
-  if (!EVP_PKEY_assign_RSA (priv->private_key, rsa)) {
-    GST_WARNING_OBJECT (self, "failed to assign RSA");
-    RSA_free (rsa);
-    rsa = NULL;
-    EVP_PKEY_free (priv->private_key);
-    priv->private_key = NULL;
-    X509_free (priv->x509);
-    priv->x509 = NULL;
-    return;
+  if (EVP_PKEY_keygen_init(ctx) <= 0) {
+    GST_WARNING_OBJECT (self, "failed to initialize key generation");
+    goto cleanup;
   }
-  rsa = NULL;
+
+  if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0) {
+    GST_WARNING_OBJECT (self, "failed to set RSA key size");
+    goto cleanup;
+  }
+
+  if (EVP_PKEY_keygen(ctx, &priv->private_key) <= 0) {
+    GST_WARNING_OBJECT (self, "failed to generate RSA key");
+    goto cleanup;
+  }
+
+  EVP_PKEY_CTX_free(ctx);
+  ctx = NULL;
 
   X509_set_version (priv->x509, 2);
 
   /* Set a random 64 bit integer as serial number */
   serial_number = BN_new ();
-  BN_pseudo_rand (serial_number, 64, 0, 0);
+  BN_rand(serial_number, 64, 0, 0);
   asn1_serial_number = X509_get_serialNumber (priv->x509);
   BN_to_ASN1_INTEGER (serial_number, asn1_serial_number);
   BN_free (serial_number);
@@ -282,14 +269,26 @@ init_generated (GstDtlsCertificate * self)
 
   if (!X509_sign (priv->x509, priv->private_key, EVP_sha256 ())) {
     GST_WARNING_OBJECT (self, "failed to sign certificate");
-    EVP_PKEY_free (priv->private_key);
-    priv->private_key = NULL;
-    X509_free (priv->x509);
-    priv->x509 = NULL;
-    return;
+    goto cleanup;
   }
 
   self->priv->pem = _gst_dtls_x509_to_pem (priv->x509);
+  return;
+
+cleanup:
+  if (priv->private_key) {
+    EVP_PKEY_free (priv->private_key);
+    priv->private_key = NULL;
+  }
+  if (priv->x509) {
+    X509_free (priv->x509);
+    priv->x509 = NULL;
+  }
+  if (ctx) {
+    EVP_PKEY_CTX_free(ctx);
+    ctx = NULL;
+  }
+  return;
 }
 
 static void

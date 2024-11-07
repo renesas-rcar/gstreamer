@@ -156,11 +156,11 @@ gst_rsvg_decode_image (GstRsvgDec * rsvg, GstBuffer * buffer,
   cairo_surface_t *surface;
   RsvgHandle *handle;
   GError *error = NULL;
-  RsvgDimensionData dimension;
-  gdouble scalex, scaley;
+  gdouble width, height;  // Replacing RsvgDimensionData
   GstMapInfo minfo;
   GstVideoFrame vframe;
   GstVideoCodecState *output_state;
+  RsvgRectangle viewport; // Viewport structure for rsvg_handle_render_document
 
   GST_LOG_OBJECT (rsvg, "parsing svg");
 
@@ -175,19 +175,24 @@ gst_rsvg_decode_image (GstRsvgDec * rsvg, GstBuffer * buffer,
     return GST_FLOW_ERROR;
   }
 
-  rsvg_handle_get_dimensions (handle, &dimension);
+  // Use rsvg_handle_get_intrinsic_size_in_pixels to get the dimensions
+  if (!rsvg_handle_get_intrinsic_size_in_pixels(handle, &width, &height)) {
+    GST_ERROR_OBJECT (rsvg, "Failed to get SVG dimensions");
+    g_object_unref (handle);
+    return GST_FLOW_ERROR;
+  }
 
   output_state = gst_video_decoder_get_output_state (decoder);
   if ((output_state == NULL)
-      || GST_VIDEO_INFO_WIDTH (&output_state->info) != dimension.width
-      || GST_VIDEO_INFO_HEIGHT (&output_state->info) != dimension.height) {
+      || GST_VIDEO_INFO_WIDTH (&output_state->info) != (gint)width
+      || GST_VIDEO_INFO_HEIGHT (&output_state->info) != (gint)height) {
 
     /* Create the output state */
     if (output_state)
       gst_video_codec_state_unref (output_state);
     output_state =
         gst_video_decoder_set_output_state (decoder, GST_RSVG_VIDEO_FORMAT,
-        dimension.width, dimension.height, rsvg->input_state);
+        (gint)width, (gint)height, rsvg->input_state);
   }
 
   ret = gst_video_decoder_allocate_output_frame (decoder, frame);
@@ -204,7 +209,6 @@ gst_rsvg_decode_image (GstRsvgDec * rsvg, GstBuffer * buffer,
       GST_VIDEO_INFO_HEIGHT (&output_state->info),
       GST_VIDEO_INFO_WIDTH (&output_state->info));
 
-
   if (!gst_video_frame_map (&vframe,
           &output_state->info, frame->output_buffer, GST_MAP_READWRITE)) {
     GST_ERROR_OBJECT (rsvg, "Failed to get SVG image");
@@ -212,6 +216,7 @@ gst_rsvg_decode_image (GstRsvgDec * rsvg, GstBuffer * buffer,
     gst_video_codec_state_unref (output_state);
     return GST_FLOW_ERROR;
   }
+
   surface =
       cairo_image_surface_create_for_data (GST_VIDEO_FRAME_PLANE_DATA (&vframe,
           0), CAIRO_FORMAT_ARGB32, GST_VIDEO_FRAME_WIDTH (&vframe),
@@ -225,19 +230,23 @@ gst_rsvg_decode_image (GstRsvgDec * rsvg, GstBuffer * buffer,
   cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
   cairo_set_source_rgba (cr, 0.0, 0.0, 0.0, 1.0);
 
-  scalex = scaley = 1.0;
-  if (GST_VIDEO_INFO_WIDTH (&output_state->info) != dimension.width) {
-    scalex =
-        ((gdouble) GST_VIDEO_INFO_WIDTH (&output_state->info)) /
-        ((gdouble) dimension.width);
+  // Define the viewport for rendering
+  viewport.x = 0;
+  viewport.y = 0;
+  viewport.width = (gdouble) GST_VIDEO_FRAME_WIDTH (&vframe);
+  viewport.height = (gdouble) GST_VIDEO_FRAME_HEIGHT (&vframe);
+
+  // Render the SVG document using rsvg_handle_render_document
+  if (!rsvg_handle_render_document(handle, cr, &viewport, &error)) {
+    GST_ERROR_OBJECT (rsvg, "Failed to render SVG document: %s", error ? error->message : "Unknown error");
+    g_object_unref (handle);
+    cairo_destroy (cr);
+    cairo_surface_destroy (surface);
+    if (error) {
+      g_error_free (error);
+    }
+    return GST_FLOW_ERROR;
   }
-  if (GST_VIDEO_INFO_HEIGHT (&output_state->info) != dimension.height) {
-    scaley =
-        ((gdouble) GST_VIDEO_INFO_HEIGHT (&output_state->info)) /
-        ((gdouble) dimension.height);
-  }
-  cairo_scale (cr, scalex, scaley);
-  rsvg_handle_render_cairo (handle, cr);
 
   g_object_unref (handle);
   cairo_destroy (cr);

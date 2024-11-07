@@ -4133,7 +4133,7 @@ end:
 }
 
 /* must be called with manifest_lock taken */
-static gboolean
+static GstFlowReturn
 gst_adaptive_demux_stream_push_event (GstAdaptiveDemuxStream * stream,
     GstEvent * event)
 {
