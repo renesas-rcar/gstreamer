@@ -3,6 +3,7 @@
  * Copyright (C) 2001-2002 Ronald Bultje <rbultje@ronald.bitfreak.net>
  *               2006 Edgard Lima <edgard.lima@gmail.com>
  *               2009 Texas Instruments, Inc - http://www.ti.com/
+ *               2019-2020, Renesas Electronics Corporation
  *
  * gstv4l2bufferpool.h V4L2 buffer pool class
  *
@@ -27,6 +28,11 @@
 
 #include <gst/gst.h>
 
+#ifdef HAVE_MMNGRBUF
+typedef struct _GstV4l2MmngrBufferPool GstV4l2MmngrBufferPool;
+typedef struct _GstV4l2MmngrBufferPoolClass GstV4l2MmngrBufferPoolClass;
+#endif
+
 typedef struct _GstV4l2BufferPool GstV4l2BufferPool;
 typedef struct _GstV4l2BufferPoolClass GstV4l2BufferPoolClass;
 typedef struct _GstV4l2Meta GstV4l2Meta;
@@ -35,6 +41,14 @@ typedef struct _GstV4l2Meta GstV4l2Meta;
 #include "gstv4l2allocator.h"
 
 G_BEGIN_DECLS
+
+#ifdef HAVE_MMNGRBUF
+#define GST_TYPE_V4L2_MMNGR_BUFFER_POOL      (gst_v4l2_mmngr_buffer_pool_get_type())
+#define GST_IS_V4L2_MMNGR_BUFFER_POOL(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_V4L2_MMNGR_BUFFER_POOL))
+#define GST_V4L2_MMNGR_BUFFER_POOL(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), GST_TYPE_V4L2_MMNGR_BUFFER_POOL, GstV4l2MmngrBufferPool))
+#define GST_V4L2_MMNGR_BUFFER_POOL_CAST(obj) ((GstV4l2MmngrBufferPool*)(obj))
+#define GST_V4L2_MMNGR_EXPORT_QUARK          (g_quark_from_string ("GstV4l2MmngrBufferPoolParentBufferData"))
+#endif
 
 #define GST_TYPE_V4L2_BUFFER_POOL      (gst_v4l2_buffer_pool_get_type())
 #define GST_IS_V4L2_BUFFER_POOL(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_V4L2_BUFFER_POOL))
@@ -106,6 +120,23 @@ struct _GstV4l2BufferPoolClass
 {
   GstBufferPoolClass parent_class;
 };
+
+#ifdef HAVE_MMNGRBUF
+struct _GstV4l2MmngrBufferPool
+{
+  GstV4l2BufferPool parent;
+
+  GArray *mmngr_bufs;
+  GArray *mmngr_id;
+};
+
+struct _GstV4l2MmngrBufferPoolClass
+{
+  GstV4l2BufferPoolClass parent_class;
+};
+
+GType gst_v4l2_mmngr_buffer_pool_get_type (void);
+#endif
 
 GType gst_v4l2_buffer_pool_get_type (void);
 
