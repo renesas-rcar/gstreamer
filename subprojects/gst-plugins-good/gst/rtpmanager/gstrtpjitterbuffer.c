@@ -10,7 +10,8 @@
  *  Copyright 2016 Pexip AS
  *   @author: Havard Graff <havard@pexip.com>
  *   @author: Stian Selnes <stian@pexip.com>
- *
+ * Copyright 2024 Renesas Electronics Corporation
+ * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License as published by the Free Software Foundation; either

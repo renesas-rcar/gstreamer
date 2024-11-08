@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2001-2002 Ronald Bultje <rbultje@ronald.bitfreak.net>
  *               2006 Edgard Lima <edgard.lima@gmail.com>
- * Copyright (C) 2017-2018,2020-2021 Renesas Electronics Corporation
+ * Copyright (C) 2017-2018,2020-2024 Renesas Electronics Corporation
  *
  * gstv4l2object.c: base class for V4L2 elements
  *

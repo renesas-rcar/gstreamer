@@ -1,7 +1,8 @@
 /* GStreamer
  * Copyright (C) <2006> Wim Taymans <wim.taymans@gmail.com>
  * Copyright (C) <2014> Jurgen Slowack <jurgenslowack@gmail.com>
- *
+ * Copyright (C) <2024> Renesas Electronics Corporation
+ * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License as published by the Free Software Foundation; either

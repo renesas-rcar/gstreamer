@@ -5,6 +5,7 @@
  *                    2002,2003 Colin Walters <walters@gnu.org>
  *                    2001,2010 Bastien Nocera <hadess@hadess.net>
  *                    2010 Sebastian Dröge <sebastian.droege@collabora.co.uk>
+ *                    2024 Renesas Electronics Corporation
  *
  * rtmpsrc.c:
  *

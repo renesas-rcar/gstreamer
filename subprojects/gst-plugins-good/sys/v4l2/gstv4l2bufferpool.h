@@ -3,7 +3,7 @@
  * Copyright (C) 2001-2002 Ronald Bultje <rbultje@ronald.bitfreak.net>
  *               2006 Edgard Lima <edgard.lima@gmail.com>
  *               2009 Texas Instruments, Inc - http://www.ti.com/
- *               2019-2020, Renesas Electronics Corporation
+ *               2019-2024, Renesas Electronics Corporation
  *
  * gstv4l2bufferpool.h V4L2 buffer pool class
  *

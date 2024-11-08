@@ -6,7 +6,7 @@
  *  Víctor Manuel Jáquez Leal <vjaquez@igalia.com>
  *  Javier Martin <javiermartin@by.com.es>
  *
- * Copyright (C) 2021 Renesas Electronics Corporation
+ * Copyright (C) 2021-2024 Renesas Electronics Corporation
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public

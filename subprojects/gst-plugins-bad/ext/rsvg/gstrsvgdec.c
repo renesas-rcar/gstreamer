@@ -1,6 +1,7 @@
 /* GStreamer
  * Copyright (C) <2009> Sebastian Dröge <sebastian.droege@collabora.co.uk>
  * Copyright (C) <2013> Luciana Fujii <luciana.fujii@collabora.co.uk>
+ * Copyright (C) 2024, Renesas Electronics Corporation
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
