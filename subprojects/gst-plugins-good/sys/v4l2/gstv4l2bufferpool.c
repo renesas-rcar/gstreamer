@@ -2096,6 +2096,7 @@ gst_v4l2_buffer_pool_new (GstV4l2Object * obj, GstCaps * caps)
   GstStructure *config;
   gchar *name, *parent_name;
   gint fd;
+  gboolean fullFactory = FALSE;
 
   fd = obj->dup (obj->video_fd);
   if (fd < 0)
@@ -2109,9 +2110,17 @@ gst_v4l2_buffer_pool_new (GstV4l2Object * obj, GstCaps * caps)
   g_free (parent_name);
 
 #ifdef HAVE_MMNGRBUF
-  if (!((obj->device_caps & V4L2_CAP_STREAMING) &&
-  (obj->req_mode == GST_V4L2_IO_AUTO) && 
-  (!V4L2_TYPE_IS_OUTPUT(obj->type)))) {
+    GstElementFactory *vspFactory = gst_element_factory_find("vspfilter");
+    GstElementFactory *encFactory = gst_element_factory_find("omxh264enc");
+    GstElementFactory *decFactory = gst_element_factory_find("omxh264dec");
+
+    fullFactory = g_type_name(gst_element_factory_get_element_type(vspFactory)) &&
+                          g_type_name(gst_element_factory_get_element_type(encFactory)) &&
+                          g_type_name(gst_element_factory_get_element_type(decFactory)) &&
+                          (!((obj->device_caps & V4L2_CAP_STREAMING) &&
+                          (obj->req_mode == GST_V4L2_IO_AUTO) &&
+                          (!V4L2_TYPE_IS_OUTPUT(obj->type))));
+  if (fullFactory) {
     if (obj->video_fd > 8 && obj->mode == GST_V4L2_IO_DMABUF &&
         (GST_VIDEO_INFO_FORMAT(&obj->info) == GST_VIDEO_FORMAT_NV12 ||
          GST_VIDEO_INFO_FORMAT(&obj->info) == GST_VIDEO_FORMAT_NV16))
