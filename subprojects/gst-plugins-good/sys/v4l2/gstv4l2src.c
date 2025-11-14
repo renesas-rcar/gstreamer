@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2001-2002 Ronald Bultje <rbultje@ronald.bitfreak.net>
  *               2006 Edgard Lima <edgard.lima@gmail.com>
- * Copyright (C) 2019-2024, Renesas Electronics Corporation
+ * Copyright (C) 2019-2025, Renesas Electronics Corporation
  *
  * gstv4l2src.c: Video4Linux2 source element
  *
@@ -121,7 +121,6 @@ struct PreferredCapsInfo
 };
 
 static void gst_v4l2src_finalize (GstV4l2Src * v4l2src);
-static gboolean gst_v4l2src_set_crop (GstV4l2Src * src);
 
 /* element methods */
 static GstStateChangeReturn gst_v4l2src_change_state (GstElement * element,
@@ -588,11 +587,6 @@ gst_v4l2src_set_format (GstV4l2Src * v4l2src, GstCaps * caps,
   if (!gst_v4l2src_do_source_crop (v4l2src))
     return FALSE;
 
-  /* Care about crop if driver has supported capability of crop (CROPCAP) */
-  if ((v4l2src->in_size.width > 0) && (v4l2src->in_size.height > 0)) {
-    gst_v4l2src_set_crop (v4l2src);
-  }
-
   return gst_v4l2_object_set_format (obj, caps, error);
 }
 
@@ -980,38 +974,6 @@ gst_v4l2src_get_caps (GstBaseSrc * src, GstCaps * filter)
   }
 
   return gst_v4l2_object_get_caps (obj, filter);
-}
-
-static gboolean
-gst_v4l2src_set_crop (GstV4l2Src * src)
-{
-  GstV4l2Object *obj;
-  struct v4l2_crop crop;
-
-  obj = src->v4l2object;
-
-  memset (&crop, 0, sizeof (crop));
-  crop.type = obj->type;
-
-  if (src->crop.width == 0)
-    src->crop.width = src->in_size.width;
-
-  if (src->crop.height == 0)
-    src->crop.height = src->in_size.height;
-
-  crop.c.top = src->crop.top;
-  crop.c.left = src->crop.left;
-  crop.c.width = src->crop.width;
-  crop.c.height = src->crop.height;
-
-  if (obj->ioctl (src->v4l2object->video_fd, VIDIOC_S_CROP, &crop) < 0) {
-    GST_ERROR_OBJECT (src, "Fail to set crop");
-    return FALSE;
-  }
-  GST_DEBUG_OBJECT (src,
-      "crop image: crop top %d crop left %d crop width %d crop height %d",
-      crop.c.top, crop.c.left, crop.c.width, crop.c.height);
-  return TRUE;
 }
 
 static gboolean
